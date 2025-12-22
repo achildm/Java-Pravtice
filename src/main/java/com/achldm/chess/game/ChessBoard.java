@@ -30,32 +30,45 @@ public class ChessBoard {
         }
         
         // 放置黑方棋子 - 正确顺序：车马象士将士象马车
+        // 第0行：黑方主力棋子
         board[0][0] = board[0][8] = ChessPiece.BLACK_CHARIOT;  // 车
         board[0][1] = board[0][7] = ChessPiece.BLACK_HORSE;    // 马
         board[0][2] = board[0][6] = ChessPiece.BLACK_ELEPHANT; // 象
         board[0][3] = board[0][5] = ChessPiece.BLACK_ADVISOR;  // 士
         board[0][4] = ChessPiece.BLACK_KING;                   // 将
         
+        // 第2行：黑方炮
         board[2][1] = board[2][7] = ChessPiece.BLACK_CANNON;   // 炮
         
-        // 黑方卒子
+        // 第3行：黑方卒子
         for (int i = 0; i < BOARD_WIDTH; i += 2) {
             board[3][i] = ChessPiece.BLACK_SOLDIER;
         }
         
-        // 放置红方棋子 - 正确顺序：车马相仕帅仕相马车
+        // 第4-5行：楚河汉界（空白区域）
+        // 这两行保持空白，形成楚河汉界
+        
+        // 第6行：红方兵
+        for (int i = 0; i < BOARD_WIDTH; i += 2) {
+            board[6][i] = ChessPiece.RED_SOLDIER;
+        }
+        
+        // 第7行：红方炮
+        board[7][1] = board[7][7] = ChessPiece.RED_CANNON;     // 炮
+        
+        // 第9行：红方主力棋子 - 正确顺序：车马相仕帅仕相马车
         board[9][0] = board[9][8] = ChessPiece.RED_CHARIOT;    // 车
         board[9][1] = board[9][7] = ChessPiece.RED_HORSE;      // 马
         board[9][2] = board[9][6] = ChessPiece.RED_ELEPHANT;   // 相
         board[9][3] = board[9][5] = ChessPiece.RED_ADVISOR;    // 仕
         board[9][4] = ChessPiece.RED_KING;                     // 帅
         
-        board[7][1] = board[7][7] = ChessPiece.RED_CANNON;     // 炮
-        
-        // 红方兵
-        for (int i = 0; i < BOARD_WIDTH; i += 2) {
-            board[6][i] = ChessPiece.RED_SOLDIER;
-        }
+        // 调试信息：打印初始棋盘布局
+        System.out.println("棋盘初始化完成：");
+        System.out.println("黑方卒子位置（第3行）：" + java.util.Arrays.toString(board[3]));
+        System.out.println("楚河汉界（第4行）：" + java.util.Arrays.toString(board[4]));
+        System.out.println("楚河汉界（第5行）：" + java.util.Arrays.toString(board[5]));
+        System.out.println("红方兵位置（第6行）：" + java.util.Arrays.toString(board[6]));
     }
     
     /**
@@ -168,8 +181,17 @@ public class ChessBoard {
     private boolean isValidKingMove(int fromX, int fromY, int toX, int toY, boolean isRed) {
         // 帅/将只能在九宫格内移动，每次只能移动一格
         int palaceMinX = 3, palaceMaxX = 5;
-        int palaceMinY = isRed ? 7 : 0;
-        int palaceMaxY = isRed ? 9 : 2;
+        int palaceMinY, palaceMaxY;
+        
+        if (isRed) {
+            // 红方帅在第7-9行
+            palaceMinY = 7;
+            palaceMaxY = 9;
+        } else {
+            // 黑方将在第0-2行
+            palaceMinY = 0;
+            palaceMaxY = 2;
+        }
         
         if (toX < palaceMinX || toX > palaceMaxX || toY < palaceMinY || toY > palaceMaxY) {
             return false;
@@ -183,8 +205,17 @@ public class ChessBoard {
     private boolean isValidAdvisorMove(int fromX, int fromY, int toX, int toY, boolean isRed) {
         // 仕/士只能在九宫格内斜着移动
         int palaceMinX = 3, palaceMaxX = 5;
-        int palaceMinY = isRed ? 7 : 0;
-        int palaceMaxY = isRed ? 9 : 2;
+        int palaceMinY, palaceMaxY;
+        
+        if (isRed) {
+            // 红方仕在第7-9行
+            palaceMinY = 7;
+            palaceMaxY = 9;
+        } else {
+            // 黑方士在第0-2行
+            palaceMinY = 0;
+            palaceMaxY = 2;
+        }
         
         if (toX < palaceMinX || toX > palaceMaxX || toY < palaceMinY || toY > palaceMaxY) {
             return false;
@@ -195,9 +226,17 @@ public class ChessBoard {
     
     private boolean isValidElephantMove(int fromX, int fromY, int toX, int toY, boolean isRed) {
         // 相/象不能过河，斜着走两格，不能被蹩脚
-        int riverY = isRed ? 4 : 5;
-        if ((isRed && toY <= riverY) || (!isRed && toY >= riverY)) {
-            return false;
+        // 红方相不能越过第4行（楚河汉界），黑方象不能越过第5行
+        if (isRed) {
+            // 红方相只能在第5-9行活动
+            if (toY < 5) {
+                return false;
+            }
+        } else {
+            // 黑方象只能在第0-4行活动
+            if (toY > 4) {
+                return false;
+            }
         }
         
         if (Math.abs(toX - fromX) != 2 || Math.abs(toY - fromY) != 2) {
@@ -259,21 +298,30 @@ public class ChessBoard {
         int dx = toX - fromX;
         int dy = toY - fromY;
         
-        // 兵/卒只能向前走，过河后可以左右走
+        // 兵/卒每次只能移动一格
+        if (Math.abs(dx) + Math.abs(dy) != 1) {
+            return false;
+        }
+        
+        // 兵/卒移动规则
         if (isRed) {
-            if (fromY > 4) {
-                // 未过河，只能向前
+            // 红方兵：初始在第6行
+            // 楚河汉界：第4-5行
+            if (fromY >= 5) {
+                // 在红方区域或楚河汉界（第5-9行），只能向前（y减小）
                 return dx == 0 && dy == -1;
             } else {
-                // 已过河，可以向前或左右
+                // 已过河到黑方区域（第0-4行），可以向前或左右，但不能后退
                 return (dx == 0 && dy == -1) || (Math.abs(dx) == 1 && dy == 0);
             }
         } else {
-            if (fromY < 5) {
-                // 未过河，只能向前
+            // 黑方卒：初始在第3行
+            // 楚河汉界：第4-5行
+            if (fromY <= 4) {
+                // 在黑方区域或楚河汉界（第0-4行），只能向前（y增大）
                 return dx == 0 && dy == 1;
             } else {
-                // 已过河，可以向前或左右
+                // 已过河到红方区域（第5-9行），可以向前或左右，但不能后退
                 return (dx == 0 && dy == 1) || (Math.abs(dx) == 1 && dy == 0);
             }
         }

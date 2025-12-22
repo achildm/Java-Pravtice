@@ -17,10 +17,11 @@ import java.net.URL;
  * 游戏界面
  */
 public class GameFrame extends JFrame {
-    private static final int BOARD_SIZE = 520;
-    private static final int CELL_SIZE = 57;
-    private static final int BOARD_OFFSET_X = 15;  // 调整偏移量
-    private static final int BOARD_OFFSET_Y = 15;  // 调整偏移量
+    private static final int BOARD_SIZE = 640;     // 增大棋盘尺寸
+    private static final int CELL_SIZE = 64;       // 调整格子大小
+    private static final int PIECE_SIZE = 48;      // 棋子大小，比格子小一些
+    private static final int BOARD_OFFSET_X = 32;  // 调整偏移量
+    private static final int BOARD_OFFSET_Y = 32;  // 调整偏移量
     
     private GameClient client;
     private ChessBoard chessBoard;
@@ -71,23 +72,48 @@ public class GameFrame extends JFrame {
                 boardImage = new ImageIcon(boardUrl).getImage();
             }
             
-            // 加载棋子图片
-            pieceImages = new Image[33];
-            for (int i = 1; i <= 32; i++) {
-                URL pieceUrl = getClass().getResource("/qizi/" + i + ".gif");
-                if (pieceUrl != null) {
-                    pieceImages[i] = new ImageIcon(pieceUrl).getImage();
-                }
-            }
-            
             // 加载选中框图片
             URL selectUrl = getClass().getResource("/qizi/select.gif");
             if (selectUrl != null) {
                 selectImage = new ImageIcon(selectUrl).getImage();
             }
             
+            // 初始化棋子图片数组
+            pieceImages = new Image[33];
+            
+            // 加载棋子图片 - 使用中文文件名
+            loadPieceImage(ChessPiece.RED_KING, "/qizi/红帅.gif");
+            loadPieceImage(ChessPiece.RED_ADVISOR, "/qizi/红士1.gif");
+            loadPieceImage(ChessPiece.RED_ELEPHANT, "/qizi/红象1.gif");
+            loadPieceImage(ChessPiece.RED_HORSE, "/qizi/红马1.gif");
+            loadPieceImage(ChessPiece.RED_CHARIOT, "/qizi/红车1.gif");
+            loadPieceImage(ChessPiece.RED_CANNON, "/qizi/红炮1.gif");
+            loadPieceImage(ChessPiece.RED_SOLDIER, "/qizi/红兵1.gif");
+            
+            loadPieceImage(ChessPiece.BLACK_KING, "/qizi/黑将.gif");
+            loadPieceImage(ChessPiece.BLACK_ADVISOR, "/qizi/黑士1.gif");
+            loadPieceImage(ChessPiece.BLACK_ELEPHANT, "/qizi/黑象1.gif");
+            loadPieceImage(ChessPiece.BLACK_HORSE, "/qizi/黑马1.gif");
+            loadPieceImage(ChessPiece.BLACK_CHARIOT, "/qizi/黑车1.gif");
+            loadPieceImage(ChessPiece.BLACK_CANNON, "/qizi/黑炮1.gif");
+            loadPieceImage(ChessPiece.BLACK_SOLDIER, "/qizi/黑兵1.gif");
+            
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+    
+    private void loadPieceImage(ChessPiece piece, String path) {
+        try {
+            URL pieceUrl = getClass().getResource(path);
+            if (pieceUrl != null) {
+                pieceImages[piece.getId()] = new ImageIcon(pieceUrl).getImage();
+                System.out.println("加载棋子图片: " + piece.getName() + " -> " + path);
+            } else {
+                System.err.println("找不到棋子图片: " + path);
+            }
+        } catch (Exception e) {
+            System.err.println("加载棋子图片失败: " + path + " - " + e.getMessage());
         }
     }
     
@@ -97,7 +123,7 @@ public class GameFrame extends JFrame {
         setResizable(false);
         
         boardPanel = new ChessBoardPanel();
-        boardPanel.setPreferredSize(new Dimension(BOARD_SIZE + 40, BOARD_SIZE + 40)); // 增加边距
+        boardPanel.setPreferredSize(new Dimension(BOARD_SIZE + 80, BOARD_SIZE + PIECE_SIZE + 80)); // 增加背景图高度和边距
         
         statusLabel = new JLabel("游戏开始 - " + (isMyTurn ? "轮到你了" : "等待对手"), JLabel.CENTER);
         statusLabel.setFont(new Font("宋体", Font.BOLD, 16));
@@ -128,8 +154,19 @@ public class GameFrame extends JFrame {
             public void mouseClicked(MouseEvent e) {
                 if (!isMyTurn) return;
                 
-                int x = (e.getX() - BOARD_OFFSET_X) / CELL_SIZE;
-                int y = (e.getY() - BOARD_OFFSET_Y) / CELL_SIZE;
+                // 调整点击坐标计算，考虑棋子的偏移
+                // 减去偏移量，然后根据视角调整
+                int x, y;
+                
+                if (isFlipped) {
+                    // 黑方视角：向右偏移一格
+                    x = (e.getX() - BOARD_OFFSET_X - CELL_SIZE + (CELL_SIZE / 2)) / CELL_SIZE;
+                    y = (e.getY() - BOARD_OFFSET_Y + (CELL_SIZE / 2)) / CELL_SIZE;
+                } else {
+                    // 红方视角：向右偏移一格，向下偏移一格
+                    x = (e.getX() - BOARD_OFFSET_X - CELL_SIZE + (CELL_SIZE / 2)) / CELL_SIZE;
+                    y = (e.getY() - BOARD_OFFSET_Y - CELL_SIZE + (CELL_SIZE / 2)) / CELL_SIZE;
+                }
                 
                 if (x >= 0 && x < ChessBoard.BOARD_WIDTH && y >= 0 && y < ChessBoard.BOARD_HEIGHT) {
                     handleBoardClick(x, y);
@@ -295,7 +332,16 @@ public class GameFrame extends JFrame {
             
             // 绘制棋盘背景
             if (boardImage != null) {
-                g2d.drawImage(boardImage, BOARD_OFFSET_X, BOARD_OFFSET_Y, BOARD_SIZE, BOARD_SIZE, this);
+                // 增加背景图高度，大概一个棋子的高度
+                int boardHeight = BOARD_SIZE + PIECE_SIZE;
+                
+                // 黑方视角下，背景图位置往上移动一格（一个棋子的高度）
+                int backgroundY = BOARD_OFFSET_Y;
+                if (isFlipped) {
+                    backgroundY = BOARD_OFFSET_Y - PIECE_SIZE;
+                }
+                
+                g2d.drawImage(boardImage, BOARD_OFFSET_X, backgroundY, BOARD_SIZE, boardHeight, this);
             } else {
                 // 如果没有背景图，绘制简单的棋盘
                 drawSimpleBoard(g2d);
@@ -312,15 +358,25 @@ public class GameFrame extends JFrame {
                     displayY = ChessBoard.BOARD_HEIGHT - 1 - selectedY;
                 }
                 
-                int drawX = BOARD_OFFSET_X + displayX * CELL_SIZE;
-                int drawY = BOARD_OFFSET_Y + displayY * CELL_SIZE;
+                // 计算选中框绘制位置，与棋子位置保持一致
+                int drawX, drawY;
+                
+                if (isFlipped) {
+                    // 黑方视角：向右移动一格
+                    drawX = BOARD_OFFSET_X + (displayX + 1) * CELL_SIZE - (PIECE_SIZE / 2);
+                    drawY = BOARD_OFFSET_Y + displayY * CELL_SIZE - (PIECE_SIZE / 2);
+                } else {
+                    // 红方视角：向右移动一格，向下移动一格
+                    drawX = BOARD_OFFSET_X + (displayX + 1) * CELL_SIZE - (PIECE_SIZE / 2);
+                    drawY = BOARD_OFFSET_Y + (displayY + 1) * CELL_SIZE - (PIECE_SIZE / 2);
+                }
                 
                 if (selectImage != null) {
-                    g2d.drawImage(selectImage, drawX, drawY, CELL_SIZE, CELL_SIZE, this);
+                    g2d.drawImage(selectImage, drawX, drawY, PIECE_SIZE, PIECE_SIZE, this);
                 } else {
                     g2d.setColor(Color.RED);
                     g2d.setStroke(new BasicStroke(3));
-                    g2d.drawRect(drawX, drawY, CELL_SIZE, CELL_SIZE);
+                    g2d.drawRect(drawX, drawY, PIECE_SIZE, PIECE_SIZE);
                 }
             }
             
@@ -343,15 +399,30 @@ public class GameFrame extends JFrame {
             g2d.setStroke(new BasicStroke(2));
             
             // 绘制网格线
-            for (int i = 0; i <= ChessBoard.BOARD_WIDTH; i++) {
+            for (int i = 0; i < ChessBoard.BOARD_WIDTH; i++) {
                 int x = BOARD_OFFSET_X + i * CELL_SIZE;
-                g2d.drawLine(x, BOARD_OFFSET_Y, x, BOARD_OFFSET_Y + BOARD_SIZE);
+                g2d.drawLine(x, BOARD_OFFSET_Y, x, BOARD_OFFSET_Y + (ChessBoard.BOARD_HEIGHT - 1) * CELL_SIZE);
             }
             
-            for (int i = 0; i <= ChessBoard.BOARD_HEIGHT; i++) {
+            for (int i = 0; i < ChessBoard.BOARD_HEIGHT; i++) {
                 int y = BOARD_OFFSET_Y + i * CELL_SIZE;
-                g2d.drawLine(BOARD_OFFSET_X, y, BOARD_OFFSET_X + BOARD_SIZE, y);
+                g2d.drawLine(BOARD_OFFSET_X, y, BOARD_OFFSET_X + (ChessBoard.BOARD_WIDTH - 1) * CELL_SIZE, y);
             }
+            
+            // 绘制九宫格斜线
+            g2d.setStroke(new BasicStroke(1));
+            
+            // 红方九宫格
+            int redPalaceX = BOARD_OFFSET_X + 3 * CELL_SIZE;
+            int redPalaceY = BOARD_OFFSET_Y + 7 * CELL_SIZE;
+            g2d.drawLine(redPalaceX, redPalaceY, redPalaceX + 2 * CELL_SIZE, redPalaceY + 2 * CELL_SIZE);
+            g2d.drawLine(redPalaceX + 2 * CELL_SIZE, redPalaceY, redPalaceX, redPalaceY + 2 * CELL_SIZE);
+            
+            // 黑方九宫格
+            int blackPalaceX = BOARD_OFFSET_X + 3 * CELL_SIZE;
+            int blackPalaceY = BOARD_OFFSET_Y;
+            g2d.drawLine(blackPalaceX, blackPalaceY, blackPalaceX + 2 * CELL_SIZE, blackPalaceY + 2 * CELL_SIZE);
+            g2d.drawLine(blackPalaceX + 2 * CELL_SIZE, blackPalaceY, blackPalaceX, blackPalaceY + 2 * CELL_SIZE);
         }
         
         private void drawPiece(Graphics2D g2d, ChessPiece piece, int x, int y) {
@@ -364,21 +435,31 @@ public class GameFrame extends JFrame {
                 displayY = ChessBoard.BOARD_HEIGHT - 1 - y;
             }
             
-            int drawX = BOARD_OFFSET_X + displayX * CELL_SIZE;
-            int drawY = BOARD_OFFSET_Y + displayY * CELL_SIZE;
+            // 计算棋子绘制位置，根据视角调整偏移
+            int drawX, drawY;
+            
+            if (isFlipped) {
+                // 黑方视角：向右移动一格
+                drawX = BOARD_OFFSET_X + (displayX + 1) * CELL_SIZE - (PIECE_SIZE / 2);
+                drawY = BOARD_OFFSET_Y + displayY * CELL_SIZE - (PIECE_SIZE / 2);
+            } else {
+                // 红方视角：向右移动一格，向下移动一格
+                drawX = BOARD_OFFSET_X + (displayX + 1) * CELL_SIZE - (PIECE_SIZE / 2);
+                drawY = BOARD_OFFSET_Y + (displayY + 1) * CELL_SIZE - (PIECE_SIZE / 2);
+            }
             
             if (pieceImages != null && piece.getId() < pieceImages.length && pieceImages[piece.getId()] != null) {
-                g2d.drawImage(pieceImages[piece.getId()], drawX, drawY, CELL_SIZE, CELL_SIZE, this);
+                g2d.drawImage(pieceImages[piece.getId()], drawX, drawY, PIECE_SIZE, PIECE_SIZE, this);
             } else {
                 // 如果没有图片，绘制文字
                 g2d.setColor(piece.isRed() ? Color.RED : Color.BLACK);
-                g2d.fillOval(drawX + 5, drawY + 5, CELL_SIZE - 10, CELL_SIZE - 10);
+                g2d.fillOval(drawX + 2, drawY + 2, PIECE_SIZE - 4, PIECE_SIZE - 4);
                 
                 g2d.setColor(Color.WHITE);
-                g2d.setFont(new Font("宋体", Font.BOLD, 20));
+                g2d.setFont(new Font("宋体", Font.BOLD, 18));
                 FontMetrics fm = g2d.getFontMetrics();
-                int textX = drawX + (CELL_SIZE - fm.stringWidth(piece.getName())) / 2;
-                int textY = drawY + (CELL_SIZE + fm.getAscent()) / 2;
+                int textX = drawX + (PIECE_SIZE - fm.stringWidth(piece.getName())) / 2;
+                int textY = drawY + (PIECE_SIZE + fm.getAscent()) / 2;
                 g2d.drawString(piece.getName(), textX, textY);
             }
         }

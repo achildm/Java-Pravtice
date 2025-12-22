@@ -1,4 +1,0 @@
-@echo off
-echo 正在启动象棋游戏服务器...
-java -cp target/classes com.achldm.chess.ChessGameMain server
-pause

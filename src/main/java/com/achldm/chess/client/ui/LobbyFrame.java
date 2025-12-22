@@ -98,7 +98,7 @@ public class LobbyFrame extends JFrame {
         // 中间棋盘图标
         JLabel boardIcon = new JLabel();
         try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/img/xiangqi.gif"));
+            ImageIcon icon = new ImageIcon(getClass().getResource("/img/xqnoone.gif"));
             if (icon.getIconWidth() > 0) {
                 Image img = icon.getImage().getScaledInstance(60, 60, Image.SCALE_SMOOTH);
                 boardIcon.setIcon(new ImageIcon(img));
