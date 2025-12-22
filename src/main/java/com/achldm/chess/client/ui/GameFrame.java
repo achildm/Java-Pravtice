@@ -1,0 +1,350 @@
+package com.achldm.chess.client.ui;
+
+import com.achldm.chess.client.network.GameClient;
+import com.achldm.chess.common.ChessPiece;
+import com.achldm.chess.common.GameMessage;
+import com.achldm.chess.game.ChessBoard;
+
+import javax.sound.sampled.*;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.net.URL;
+
+/**
+ * 游戏界面
+ */
+public class GameFrame extends JFrame {
+    private static final int BOARD_SIZE = 520;
+    private static final int CELL_SIZE = 57;
+    private static final int BOARD_OFFSET_X = 10;
+    private static final int BOARD_OFFSET_Y = 10;
+    
+    private GameClient client;
+    private ChessBoard chessBoard;
+    private boolean isRed;
+    private boolean isMyTurn;
+    
+    private ChessBoardPanel boardPanel;
+    private JLabel statusLabel;
+    private JLabel timeLabel;
+    private Timer gameTimer;
+    private int timeLeft = 600; // 10分钟
+    
+    private int selectedX = -1, selectedY = -1;
+    private Image boardImage;
+    private Image[] pieceImages;
+    private Image selectImage;
+    
+    public GameFrame(GameClient client, boolean isRed) {
+        this.client = client;
+        this.isRed = isRed;
+        this.isMyTurn = isRed; // 红方先行
+        this.chessBoard = new ChessBoard();
+        
+        client.setGameFrame(this);
+        
+        loadImages();
+        initComponents();
+        setupLayout();
+        setupEventHandlers();
+        startTimer();
+    }
+    
+    private void loadImages() {
+        try {
+            // 加载棋盘图片
+            URL boardUrl = getClass().getResource("/qizi/xqboard.gif");
+            if (boardUrl != null) {
+                boardImage = new ImageIcon(boardUrl).getImage();
+            }
+            
+            // 加载棋子图片
+            pieceImages = new Image[33];
+            for (int i = 1; i <= 32; i++) {
+                URL pieceUrl = getClass().getResource("/qizi/" + i + ".gif");
+                if (pieceUrl != null) {
+                    pieceImages[i] = new ImageIcon(pieceUrl).getImage();
+                }
+            }
+            
+            // 加载选中框图片
+            URL selectUrl = getClass().getResource("/qizi/select.gif");
+            if (selectUrl != null) {
+                selectImage = new ImageIcon(selectUrl).getImage();
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void initComponents() {
+        setTitle("象棋游戏 - " + (isRed ? "红方" : "黑方"));
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(false);
+        
+        boardPanel = new ChessBoardPanel();
+        boardPanel.setPreferredSize(new Dimension(BOARD_SIZE + 20, BOARD_SIZE + 20));
+        
+        statusLabel = new JLabel("游戏开始 - " + (isMyTurn ? "轮到你了" : "等待对手"), JLabel.CENTER);
+        statusLabel.setFont(new Font("宋体", Font.BOLD, 16));
+        
+        timeLabel = new JLabel("剩余时间: 10:00", JLabel.CENTER);
+        timeLabel.setFont(new Font("宋体", Font.PLAIN, 14));
+    }
+    
+    private void setupLayout() {
+        setLayout(new BorderLayout());
+        
+        // 顶部信息面板
+        JPanel topPanel = new JPanel(new GridLayout(2, 1));
+        topPanel.add(statusLabel);
+        topPanel.add(timeLabel);
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        add(topPanel, BorderLayout.NORTH);
+        add(boardPanel, BorderLayout.CENTER);
+        
+        pack();
+        setLocationRelativeTo(null);
+    }
+    
+    private void setupEventHandlers() {
+        boardPanel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (!isMyTurn) return;
+                
+                int x = (e.getX() - BOARD_OFFSET_X) / CELL_SIZE;
+                int y = (e.getY() - BOARD_OFFSET_Y) / CELL_SIZE;
+                
+                if (x >= 0 && x < ChessBoard.BOARD_WIDTH && y >= 0 && y < ChessBoard.BOARD_HEIGHT) {
+                    handleBoardClick(x, y);
+                }
+            }
+        });
+    }
+    
+    private void handleBoardClick(int x, int y) {
+        ChessPiece piece = chessBoard.getPiece(x, y);
+        
+        if (selectedX == -1 && selectedY == -1) {
+            // 选择棋子
+            if (!piece.isEmpty() && piece.isRed() == isRed) {
+                selectedX = x;
+                selectedY = y;
+                boardPanel.repaint();
+                playSound("select");
+            }
+        } else {
+            // 移动棋子
+            if (x == selectedX && y == selectedY) {
+                // 取消选择
+                selectedX = selectedY = -1;
+                boardPanel.repaint();
+            } else if (chessBoard.isValidMove(selectedX, selectedY, x, y)) {
+                // 发送移动消息
+                GameMessage moveMsg = new GameMessage(GameMessage.MessageType.MOVE);
+                moveMsg.setFromX(selectedX);
+                moveMsg.setFromY(selectedY);
+                moveMsg.setToX(x);
+                moveMsg.setToY(y);
+                client.sendMessage(moveMsg);
+                
+                // 本地移动
+                chessBoard.movePiece(selectedX, selectedY, x, y);
+                selectedX = selectedY = -1;
+                isMyTurn = false;
+                
+                updateStatus();
+                boardPanel.repaint();
+                playSound("go");
+                
+                // 检查游戏是否结束
+                if (chessBoard.isGameOver()) {
+                    onGameOver(isRed);
+                }
+            } else {
+                // 重新选择
+                if (!piece.isEmpty() && piece.isRed() == isRed) {
+                    selectedX = x;
+                    selectedY = y;
+                    boardPanel.repaint();
+                }
+            }
+        }
+    }
+    
+    private void startTimer() {
+        gameTimer = new Timer(1000, e -> {
+            timeLeft--;
+            updateTimeDisplay();
+            
+            if (timeLeft <= 0) {
+                gameTimer.stop();
+                onGameOver(!isRed); // 超时则对方获胜
+            }
+        });
+        gameTimer.start();
+    }
+    
+    private void updateTimeDisplay() {
+        int minutes = timeLeft / 60;
+        int seconds = timeLeft % 60;
+        timeLabel.setText(String.format("剩余时间: %d:%02d", minutes, seconds));
+    }
+    
+    private void updateStatus() {
+        String status = isMyTurn ? "轮到你了" : "等待对手";
+        statusLabel.setText("游戏进行中 - " + status);
+    }
+    
+    /**
+     * 接收对手移动
+     */
+    public void onOpponentMove(int fromX, int fromY, int toX, int toY) {
+        SwingUtilities.invokeLater(() -> {
+            chessBoard.movePiece(fromX, fromY, toX, toY);
+            isMyTurn = true;
+            updateStatus();
+            boardPanel.repaint();
+            playSound("go");
+            
+            // 检查游戏是否结束
+            if (chessBoard.isGameOver()) {
+                onGameOver(!isRed);
+            }
+        });
+    }
+    
+    /**
+     * 游戏结束
+     */
+    public void onGameOver(boolean redWin) {
+        SwingUtilities.invokeLater(() -> {
+            gameTimer.stop();
+            
+            String message;
+            if ((redWin && isRed) || (!redWin && !isRed)) {
+                message = "恭喜你获胜！";
+                playSound("jiang");
+            } else {
+                message = "很遗憾，你败了！";
+            }
+            
+            statusLabel.setText("游戏结束 - " + message);
+            
+            int option = JOptionPane.showConfirmDialog(this, 
+                message + "\n是否返回大厅？", 
+                "游戏结束", 
+                JOptionPane.YES_NO_OPTION);
+                
+            if (option == JOptionPane.YES_OPTION) {
+                LobbyFrame lobbyFrame = new LobbyFrame(client);
+                lobbyFrame.setVisible(true);
+                dispose();
+            }
+        });
+    }
+    
+    private void playSound(String soundName) {
+        try {
+            URL soundUrl = getClass().getResource("/audio/" + soundName + ".wav");
+            if (soundUrl != null) {
+                AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(soundUrl);
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioInputStream);
+                clip.start();
+            }
+        } catch (Exception e) {
+            // 忽略音效播放错误
+        }
+    }
+    
+    /**
+     * 棋盘绘制面板
+     */
+    private class ChessBoardPanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            
+            Graphics2D g2d = (Graphics2D) g;
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            
+            // 绘制棋盘背景
+            if (boardImage != null) {
+                g2d.drawImage(boardImage, BOARD_OFFSET_X, BOARD_OFFSET_Y, BOARD_SIZE, BOARD_SIZE, this);
+            } else {
+                // 如果没有背景图，绘制简单的棋盘
+                drawSimpleBoard(g2d);
+            }
+            
+            // 绘制选中框
+            if (selectedX >= 0 && selectedY >= 0) {
+                int drawX = BOARD_OFFSET_X + selectedX * CELL_SIZE;
+                int drawY = BOARD_OFFSET_Y + selectedY * CELL_SIZE;
+                
+                if (selectImage != null) {
+                    g2d.drawImage(selectImage, drawX, drawY, CELL_SIZE, CELL_SIZE, this);
+                } else {
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3));
+                    g2d.drawRect(drawX, drawY, CELL_SIZE, CELL_SIZE);
+                }
+            }
+            
+            // 绘制棋子
+            for (int y = 0; y < ChessBoard.BOARD_HEIGHT; y++) {
+                for (int x = 0; x < ChessBoard.BOARD_WIDTH; x++) {
+                    ChessPiece piece = chessBoard.getPiece(x, y);
+                    if (!piece.isEmpty()) {
+                        drawPiece(g2d, piece, x, y);
+                    }
+                }
+            }
+        }
+        
+        private void drawSimpleBoard(Graphics2D g2d) {
+            g2d.setColor(new Color(255, 206, 84));
+            g2d.fillRect(BOARD_OFFSET_X, BOARD_OFFSET_Y, BOARD_SIZE, BOARD_SIZE);
+            
+            g2d.setColor(Color.BLACK);
+            g2d.setStroke(new BasicStroke(2));
+            
+            // 绘制网格线
+            for (int i = 0; i <= ChessBoard.BOARD_WIDTH; i++) {
+                int x = BOARD_OFFSET_X + i * CELL_SIZE;
+                g2d.drawLine(x, BOARD_OFFSET_Y, x, BOARD_OFFSET_Y + BOARD_SIZE);
+            }
+            
+            for (int i = 0; i <= ChessBoard.BOARD_HEIGHT; i++) {
+                int y = BOARD_OFFSET_Y + i * CELL_SIZE;
+                g2d.drawLine(BOARD_OFFSET_X, y, BOARD_OFFSET_X + BOARD_SIZE, y);
+            }
+        }
+        
+        private void drawPiece(Graphics2D g2d, ChessPiece piece, int x, int y) {
+            int drawX = BOARD_OFFSET_X + x * CELL_SIZE;
+            int drawY = BOARD_OFFSET_Y + y * CELL_SIZE;
+            
+            if (pieceImages != null && piece.getId() < pieceImages.length && pieceImages[piece.getId()] != null) {
+                g2d.drawImage(pieceImages[piece.getId()], drawX, drawY, CELL_SIZE, CELL_SIZE, this);
+            } else {
+                // 如果没有图片，绘制文字
+                g2d.setColor(piece.isRed() ? Color.RED : Color.BLACK);
+                g2d.fillOval(drawX + 5, drawY + 5, CELL_SIZE - 10, CELL_SIZE - 10);
+                
+                g2d.setColor(Color.WHITE);
+                g2d.setFont(new Font("宋体", Font.BOLD, 20));
+                FontMetrics fm = g2d.getFontMetrics();
+                int textX = drawX + (CELL_SIZE - fm.stringWidth(piece.getName())) / 2;
+                int textY = drawY + (CELL_SIZE + fm.getAscent()) / 2;
+                g2d.drawString(piece.getName(), textX, textY);
+            }
+        }
+    }
+}
