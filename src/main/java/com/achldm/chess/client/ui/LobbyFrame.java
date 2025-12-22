@@ -22,8 +22,16 @@ public class LobbyFrame extends JFrame {
     private JButton exitButton;
     private boolean isMatching = false;
     
-    public LobbyFrame(GameClient client) {
+    // 用户信息
+    private String username;
+    private ImageIcon userAvatar;
+    private int avatarIndex;
+    
+    public LobbyFrame(GameClient client, String username, ImageIcon avatar, int avatarIndex) {
         this.client = client;
+        this.username = username;
+        this.userAvatar = avatar;
+        this.avatarIndex = avatarIndex;
         client.setLobbyFrame(this);
         initComponents();
         setupLayout();
@@ -140,20 +148,29 @@ public class LobbyFrame extends JFrame {
         
         // 头像
         JLabel avatarLabel = new JLabel();
-        try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/face/1-1.gif"));
-            if (icon.getIconWidth() > 0) {
-                Image img = icon.getImage().getScaledInstance(80, 80, Image.SCALE_SMOOTH);
-                avatarLabel.setIcon(new ImageIcon(img));
+        if (userAvatar != null) {
+            // 缩放头像到80x80
+            Image img = userAvatar.getImage().getScaledInstance(80, 80, Image.SCALE_SMOOTH);
+            avatarLabel.setIcon(new ImageIcon(img));
+        } else {
+            // 如果没有头像，尝试加载默认头像
+            try {
+                String path = "/face/" + avatarIndex + "-1.gif";
+                java.net.URL imageURL = getClass().getResource(path);
+                if (imageURL != null) {
+                    ImageIcon icon = new ImageIcon(imageURL);
+                    Image img = icon.getImage().getScaledInstance(80, 80, Image.SCALE_SMOOTH);
+                    avatarLabel.setIcon(new ImageIcon(img));
+                }
+            } catch (Exception e) {
+                avatarLabel.setText("头像");
             }
-        } catch (Exception e) {
-            avatarLabel.setText("头像");
         }
         avatarLabel.setHorizontalAlignment(JLabel.CENTER);
         
         // 用户信息
         JPanel infoPanel = new JPanel(new GridLayout(3, 1));
-        infoPanel.add(new JLabel("用户: 玩家", JLabel.CENTER));
+        infoPanel.add(new JLabel("用户: " + (username != null ? username : "玩家"), JLabel.CENTER));
         infoPanel.add(new JLabel("等级: 1", JLabel.CENTER));
         infoPanel.add(new JLabel("胜率: 0%", JLabel.CENTER));
         
@@ -305,7 +322,7 @@ public class LobbyFrame extends JFrame {
             
             // 延迟一秒后打开游戏界面
             Timer timer = new Timer(1000, e -> {
-                GameFrame gameFrame = new GameFrame(client, isRed);
+                GameFrame gameFrame = new GameFrame(client, isRed, username, userAvatar, avatarIndex);
                 gameFrame.setVisible(true);
                 dispose();
             });

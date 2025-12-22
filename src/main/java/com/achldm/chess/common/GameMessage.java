@@ -28,6 +28,8 @@ public class GameMessage implements Serializable {
     private int fromX, fromY, toX, toY;  // 棋子移动坐标
     private boolean isRed;               // 是否红方
     private long timestamp;
+    private int avatarIndex;             // 头像索引
+    private String userInfo;             // 用户信息
     
     public GameMessage(MessageType type) {
         this.type = type;
@@ -61,4 +63,10 @@ public class GameMessage implements Serializable {
     
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    
+    public int getAvatarIndex() { return avatarIndex; }
+    public void setAvatarIndex(int avatarIndex) { this.avatarIndex = avatarIndex; }
+    
+    public String getUserInfo() { return userInfo; }
+    public void setUserInfo(String userInfo) { this.userInfo = userInfo; }
 }

@@ -19,13 +19,19 @@ import java.net.URL;
 public class GameFrame extends JFrame {
     private static final int BOARD_SIZE = 520;
     private static final int CELL_SIZE = 57;
-    private static final int BOARD_OFFSET_X = 10;
-    private static final int BOARD_OFFSET_Y = 10;
+    private static final int BOARD_OFFSET_X = 15;  // 调整偏移量
+    private static final int BOARD_OFFSET_Y = 15;  // 调整偏移量
     
     private GameClient client;
     private ChessBoard chessBoard;
     private boolean isRed;
     private boolean isMyTurn;
+    private boolean isFlipped; // 是否翻转视角
+    
+    // 用户信息
+    private String username;
+    private ImageIcon userAvatar;
+    private int avatarIndex;
     
     private ChessBoardPanel boardPanel;
     private JLabel statusLabel;
@@ -38,11 +44,15 @@ public class GameFrame extends JFrame {
     private Image[] pieceImages;
     private Image selectImage;
     
-    public GameFrame(GameClient client, boolean isRed) {
+    public GameFrame(GameClient client, boolean isRed, String username, ImageIcon avatar, int avatarIndex) {
         this.client = client;
         this.isRed = isRed;
         this.isMyTurn = isRed; // 红方先行
+        this.isFlipped = !isRed; // 黑方翻转视角
         this.chessBoard = new ChessBoard();
+        this.username = username;
+        this.userAvatar = avatar;
+        this.avatarIndex = avatarIndex;
         
         client.setGameFrame(this);
         
@@ -82,12 +92,12 @@ public class GameFrame extends JFrame {
     }
     
     private void initComponents() {
-        setTitle("象棋游戏 - " + (isRed ? "红方" : "黑方"));
+        setTitle("象棋游戏 - " + (isRed ? "红方" : "黑方") + " - " + (username != null ? username : "玩家"));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
         
         boardPanel = new ChessBoardPanel();
-        boardPanel.setPreferredSize(new Dimension(BOARD_SIZE + 20, BOARD_SIZE + 20));
+        boardPanel.setPreferredSize(new Dimension(BOARD_SIZE + 40, BOARD_SIZE + 40)); // 增加边距
         
         statusLabel = new JLabel("游戏开始 - " + (isMyTurn ? "轮到你了" : "等待对手"), JLabel.CENTER);
         statusLabel.setFont(new Font("宋体", Font.BOLD, 16));
@@ -129,33 +139,41 @@ public class GameFrame extends JFrame {
     }
     
     private void handleBoardClick(int x, int y) {
-        ChessPiece piece = chessBoard.getPiece(x, y);
+        // 如果视角翻转，需要转换坐标
+        int actualX = x;
+        int actualY = y;
+        if (isFlipped) {
+            actualX = ChessBoard.BOARD_WIDTH - 1 - x;
+            actualY = ChessBoard.BOARD_HEIGHT - 1 - y;
+        }
+        
+        ChessPiece piece = chessBoard.getPiece(actualX, actualY);
         
         if (selectedX == -1 && selectedY == -1) {
             // 选择棋子
             if (!piece.isEmpty() && piece.isRed() == isRed) {
-                selectedX = x;
-                selectedY = y;
+                selectedX = actualX;
+                selectedY = actualY;
                 boardPanel.repaint();
                 playSound("select");
             }
         } else {
             // 移动棋子
-            if (x == selectedX && y == selectedY) {
+            if (actualX == selectedX && actualY == selectedY) {
                 // 取消选择
                 selectedX = selectedY = -1;
                 boardPanel.repaint();
-            } else if (chessBoard.isValidMove(selectedX, selectedY, x, y)) {
+            } else if (chessBoard.isValidMove(selectedX, selectedY, actualX, actualY)) {
                 // 发送移动消息
                 GameMessage moveMsg = new GameMessage(GameMessage.MessageType.MOVE);
                 moveMsg.setFromX(selectedX);
                 moveMsg.setFromY(selectedY);
-                moveMsg.setToX(x);
-                moveMsg.setToY(y);
+                moveMsg.setToX(actualX);
+                moveMsg.setToY(actualY);
                 client.sendMessage(moveMsg);
                 
                 // 本地移动
-                chessBoard.movePiece(selectedX, selectedY, x, y);
+                chessBoard.movePiece(selectedX, selectedY, actualX, actualY);
                 selectedX = selectedY = -1;
                 isMyTurn = false;
                 
@@ -170,8 +188,8 @@ public class GameFrame extends JFrame {
             } else {
                 // 重新选择
                 if (!piece.isEmpty() && piece.isRed() == isRed) {
-                    selectedX = x;
-                    selectedY = y;
+                    selectedX = actualX;
+                    selectedY = actualY;
                     boardPanel.repaint();
                 }
             }
@@ -243,7 +261,7 @@ public class GameFrame extends JFrame {
                 JOptionPane.YES_NO_OPTION);
                 
             if (option == JOptionPane.YES_OPTION) {
-                LobbyFrame lobbyFrame = new LobbyFrame(client);
+                LobbyFrame lobbyFrame = new LobbyFrame(client, username, userAvatar, avatarIndex);
                 lobbyFrame.setVisible(true);
                 dispose();
             }
@@ -285,8 +303,17 @@ public class GameFrame extends JFrame {
             
             // 绘制选中框
             if (selectedX >= 0 && selectedY >= 0) {
-                int drawX = BOARD_OFFSET_X + selectedX * CELL_SIZE;
-                int drawY = BOARD_OFFSET_Y + selectedY * CELL_SIZE;
+                int displayX = selectedX;
+                int displayY = selectedY;
+                
+                // 如果视角翻转，转换显示坐标
+                if (isFlipped) {
+                    displayX = ChessBoard.BOARD_WIDTH - 1 - selectedX;
+                    displayY = ChessBoard.BOARD_HEIGHT - 1 - selectedY;
+                }
+                
+                int drawX = BOARD_OFFSET_X + displayX * CELL_SIZE;
+                int drawY = BOARD_OFFSET_Y + displayY * CELL_SIZE;
                 
                 if (selectImage != null) {
                     g2d.drawImage(selectImage, drawX, drawY, CELL_SIZE, CELL_SIZE, this);
@@ -328,8 +355,17 @@ public class GameFrame extends JFrame {
         }
         
         private void drawPiece(Graphics2D g2d, ChessPiece piece, int x, int y) {
-            int drawX = BOARD_OFFSET_X + x * CELL_SIZE;
-            int drawY = BOARD_OFFSET_Y + y * CELL_SIZE;
+            int displayX = x;
+            int displayY = y;
+            
+            // 如果视角翻转，转换显示坐标
+            if (isFlipped) {
+                displayX = ChessBoard.BOARD_WIDTH - 1 - x;
+                displayY = ChessBoard.BOARD_HEIGHT - 1 - y;
+            }
+            
+            int drawX = BOARD_OFFSET_X + displayX * CELL_SIZE;
+            int drawY = BOARD_OFFSET_Y + displayY * CELL_SIZE;
             
             if (pieceImages != null && piece.getId() < pieceImages.length && pieceImages[piece.getId()] != null) {
                 g2d.drawImage(pieceImages[piece.getId()], drawX, drawY, CELL_SIZE, CELL_SIZE, this);

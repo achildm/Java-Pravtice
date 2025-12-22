@@ -246,6 +246,7 @@ public class LoginFrame extends JFrame {
             GameMessage loginMsg = new GameMessage(GameMessage.MessageType.LOGIN);
             loginMsg.setUsername(username);
             loginMsg.setContent(""); // 暂时不需要密码
+            loginMsg.setAvatarIndex(selectedAvatarIndex); // 传递头像索引
             client.sendMessage(loginMsg);
             
             // 禁用连接按钮，防止重复点击
@@ -288,8 +289,8 @@ public class LoginFrame extends JFrame {
         SwingUtilities.invokeLater(() -> {
             System.out.println("登录成功，打开大厅界面"); // 调试信息
             
-            // 打开大厅界面
-            LobbyFrame lobbyFrame = new LobbyFrame(client);
+            // 打开大厅界面，传递用户信息
+            LobbyFrame lobbyFrame = new LobbyFrame(client, usernameField.getText().trim(), selectedAvatar, selectedAvatarIndex);
             lobbyFrame.setVisible(true);
             
             // 关闭登录界面
