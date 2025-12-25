@@ -104,10 +104,78 @@ public class GameServer {
      * 处理聊天消息
      */
     public void handleChatMessage(GameMessage chatMessage, ClientHandler sender) {
-        // 广播聊天消息给所有在线客户端
+        // 找到发送者所在的游戏房间，只在房间内转发聊天消息
+        for (GameRoom room : gameRooms.values()) {
+            if (room.containsPlayer(sender)) {
+                room.handleChatMessage(chatMessage, sender);
+                return;
+            }
+        }
+        
+        // 如果不在游戏房间中，广播给所有在线客户端（大厅聊天）
         for (ClientHandler client : clients.values()) {
             if (client != sender) {
                 client.sendMessage(chatMessage);
+            }
+        }
+    }
+    
+    /**
+     * 处理悔棋请求
+     */
+    public void handleUndoRequest(ClientHandler sender) {
+        for (GameRoom room : gameRooms.values()) {
+            if (room.containsPlayer(sender)) {
+                room.handleUndoRequest(sender);
+                break;
+            }
+        }
+    }
+    
+    /**
+     * 处理悔棋回应
+     */
+    public void handleUndoResponse(GameMessage response, ClientHandler sender) {
+        for (GameRoom room : gameRooms.values()) {
+            if (room.containsPlayer(sender)) {
+                room.handleUndoResponse(response, sender);
+                break;
+            }
+        }
+    }
+    
+    /**
+     * 处理求和请求
+     */
+    public void handleDrawRequest(ClientHandler sender) {
+        for (GameRoom room : gameRooms.values()) {
+            if (room.containsPlayer(sender)) {
+                room.handleDrawRequest(sender);
+                break;
+            }
+        }
+    }
+    
+    /**
+     * 处理求和回应
+     */
+    public void handleDrawResponse(GameMessage response, ClientHandler sender) {
+        for (GameRoom room : gameRooms.values()) {
+            if (room.containsPlayer(sender)) {
+                room.handleDrawResponse(response, sender);
+                break;
+            }
+        }
+    }
+    
+    /**
+     * 处理认输
+     */
+    public void handleSurrender(ClientHandler sender) {
+        for (GameRoom room : gameRooms.values()) {
+            if (room.containsPlayer(sender)) {
+                room.handleSurrender(sender);
+                break;
             }
         }
     }

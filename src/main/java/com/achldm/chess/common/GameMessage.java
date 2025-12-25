@@ -19,7 +19,13 @@ public class GameMessage implements Serializable {
         GAME_OVER,      // 游戏结束
         CHAT,           // 聊天消息
         HEARTBEAT,      // 心跳包
-        DISCONNECT      // 断开连接
+        DISCONNECT,     // 断开连接
+        UNDO_REQUEST,   // 悔棋请求
+        UNDO_RESPONSE,  // 悔棋回应
+        UNDO_REFRESH,   // 悔棋后棋盘刷新
+        DRAW_REQUEST,   // 求和请求
+        DRAW_RESPONSE,  // 求和回应
+        SURRENDER       // 认输
     }
     
     private MessageType type;
@@ -30,6 +36,9 @@ public class GameMessage implements Serializable {
     private long timestamp;
     private int avatarIndex;             // 头像索引
     private String userInfo;             // 用户信息
+    private boolean accepted;            // 请求是否被接受（用于悔棋、求和回应）
+    private String reason;               // 拒绝原因
+    private String boardState;           // 棋盘状态（用于悔棋刷新）
     
     public GameMessage(MessageType type) {
         this.type = type;
@@ -69,4 +78,13 @@ public class GameMessage implements Serializable {
     
     public String getUserInfo() { return userInfo; }
     public void setUserInfo(String userInfo) { this.userInfo = userInfo; }
+    
+    public boolean isAccepted() { return accepted; }
+    public void setAccepted(boolean accepted) { this.accepted = accepted; }
+    
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+    
+    public String getBoardState() { return boardState; }
+    public void setBoardState(String boardState) { this.boardState = boardState; }
 }

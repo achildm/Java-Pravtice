@@ -107,6 +107,51 @@ public class ChessBoard {
     }
     
     /**
+     * 撤销移动（用于悔棋功能）
+     */
+    public void undoMove(int fromX, int fromY, int toX, int toY, ChessPiece capturedPiece) {
+        // 将棋子移回原位置
+        ChessPiece piece = getPiece(toX, toY);
+        setPiece(fromX, fromY, piece);
+        
+        // 恢复被吃掉的棋子（如果有的话）
+        if (capturedPiece != null && !capturedPiece.isEmpty()) {
+            setPiece(toX, toY, capturedPiece);
+        } else {
+            setPiece(toX, toY, ChessPiece.EMPTY);
+        }
+        
+        // 切换回合
+        redTurn = !redTurn;
+    }
+    
+    /**
+     * 获取棋盘的深拷贝（用于保存状态）
+     */
+    public ChessBoard copy() {
+        ChessBoard copy = new ChessBoard();
+        for (int i = 0; i < BOARD_HEIGHT; i++) {
+            for (int j = 0; j < BOARD_WIDTH; j++) {
+                copy.board[i][j] = this.board[i][j];
+            }
+        }
+        copy.redTurn = this.redTurn;
+        return copy;
+    }
+    
+    /**
+     * 从另一个棋盘状态恢复当前棋盘
+     */
+    public void restoreFrom(ChessBoard other) {
+        for (int i = 0; i < BOARD_HEIGHT; i++) {
+            for (int j = 0; j < BOARD_WIDTH; j++) {
+                this.board[i][j] = other.board[i][j];
+            }
+        }
+        this.redTurn = other.redTurn;
+    }
+    
+    /**
      * 检查移动是否合法
      */
     public boolean isValidMove(int fromX, int fromY, int toX, int toY) {
@@ -390,5 +435,50 @@ public class ChessBoard {
     
     public void setRedTurn(boolean redTurn) {
         this.redTurn = redTurn;
+    }
+    
+    /**
+     * 将棋盘状态序列化为字符串
+     */
+    public String serialize() {
+        StringBuilder sb = new StringBuilder();
+        // 添加回合信息
+        sb.append(redTurn ? "R" : "B").append("|");
+        
+        // 添加棋盘状态
+        for (int y = 0; y < BOARD_HEIGHT; y++) {
+            for (int x = 0; x < BOARD_WIDTH; x++) {
+                ChessPiece piece = board[y][x];
+                sb.append(piece.getId()).append(",");
+            }
+        }
+        return sb.toString();
+    }
+    
+    /**
+     * 从字符串反序列化棋盘状态
+     */
+    public static ChessBoard deserialize(String data) {
+        ChessBoard chessBoard = new ChessBoard();
+        String[] parts = data.split("\\|");
+        
+        // 解析回合信息
+        chessBoard.redTurn = "R".equals(parts[0]);
+        
+        // 解析棋盘状态
+        String[] pieceIds = parts[1].split(",");
+        int index = 0;
+        
+        for (int y = 0; y < BOARD_HEIGHT; y++) {
+            for (int x = 0; x < BOARD_WIDTH; x++) {
+                if (index < pieceIds.length && !pieceIds[index].isEmpty()) {
+                    int pieceId = Integer.parseInt(pieceIds[index]);
+                    chessBoard.board[y][x] = ChessPiece.fromId(pieceId);
+                }
+                index++;
+            }
+        }
+        
+        return chessBoard;
     }
 }

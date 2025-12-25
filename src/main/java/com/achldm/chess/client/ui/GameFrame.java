@@ -40,6 +40,12 @@ public class GameFrame extends JFrame {
     private Timer gameTimer;
     private int timeLeft = 600; // 10分钟
     
+    // 聊天相关组件
+    private ChatPanel chatPanel;
+    
+    // 游戏功能按钮
+    private GameControlPanel controlPanel;
+    
     private int selectedX = -1, selectedY = -1;
     private Image boardImage;
     private Image[] pieceImages;
@@ -130,6 +136,12 @@ public class GameFrame extends JFrame {
         
         timeLabel = new JLabel("剩余时间: 10:00", JLabel.CENTER);
         timeLabel.setFont(new Font("宋体", Font.PLAIN, 14));
+        
+        // 初始化聊天面板和控制面板
+        chatPanel = new ChatPanel(client, username);
+        controlPanel = new GameControlPanel(client, username, chatPanel);
+        // 游戏开始时，红方先行，所以红方不能悔棋，黑方也不能悔棋
+        controlPanel.setUndoEnabled(false);
     }
     
     private void setupLayout() {
@@ -141,8 +153,17 @@ public class GameFrame extends JFrame {
         topPanel.add(timeLabel);
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
+        // 右侧面板：聊天和功能按钮
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.setPreferredSize(new Dimension(280, 0));
+        rightPanel.setBorder(BorderFactory.createTitledBorder("游戏功能"));
+        
+        rightPanel.add(chatPanel, BorderLayout.CENTER);
+        rightPanel.add(controlPanel, BorderLayout.SOUTH);
+        
         add(topPanel, BorderLayout.NORTH);
         add(boardPanel, BorderLayout.CENTER);
+        add(rightPanel, BorderLayout.EAST);
         
         pack();
         setLocationRelativeTo(null);
@@ -255,6 +276,8 @@ public class GameFrame extends JFrame {
     private void updateStatus() {
         String status = isMyTurn ? "轮到你了" : "等待对手";
         statusLabel.setText("游戏进行中 - " + status);
+        // 修复悔棋按钮逻辑：刚下完棋的一方（非当前回合方）可以悔棋
+        controlPanel.setUndoEnabled(!isMyTurn);
     }
     
     /**
@@ -276,6 +299,30 @@ public class GameFrame extends JFrame {
     }
     
     /**
+     * 处理悔棋后的棋盘刷新
+     */
+    public void onUndoRefresh(boolean isRedTurn, String boardState) {
+        SwingUtilities.invokeLater(() -> {
+            // 使用服务器发送的棋盘状态恢复棋盘
+            if (boardState != null && !boardState.isEmpty()) {
+                chessBoard = ChessBoard.deserialize(boardState);
+            } else {
+                // 如果没有棋盘状态，重新初始化
+                chessBoard = new ChessBoard();
+            }
+            
+            selectedX = selectedY = -1;
+            
+            // 根据服务器告诉我们的回合信息设置当前回合
+            isMyTurn = (isRedTurn == isRed);
+            
+            updateStatus();
+            boardPanel.repaint();
+            chatPanel.appendSystemMessage("悔棋成功，棋盘已恢复到上一步状态");
+        });
+    }
+    
+    /**
      * 游戏结束
      */
     public void onGameOver(boolean redWin) {
@@ -290,6 +337,142 @@ public class GameFrame extends JFrame {
                 message = "很遗憾，你败了！";
             }
             
+            statusLabel.setText("游戏结束 - " + message);
+            
+            int option = JOptionPane.showConfirmDialog(this, 
+                message + "\n是否返回大厅？", 
+                "游戏结束", 
+                JOptionPane.YES_NO_OPTION);
+                
+            if (option == JOptionPane.YES_OPTION) {
+                LobbyFrame lobbyFrame = new LobbyFrame(client, username, userAvatar, avatarIndex);
+                lobbyFrame.setVisible(true);
+                dispose();
+            }
+        });
+    }
+    
+    /**
+     * 接收聊天消息
+     */
+    public void onChatMessage(String sender, String message) {
+        chatPanel.appendMessage(sender, message);
+    }
+    
+    /**
+     * 接收悔棋请求
+     */
+    public void onUndoRequest(String requester) {
+        SwingUtilities.invokeLater(() -> {
+            int option = JOptionPane.showConfirmDialog(this, 
+                requester + " 请求悔棋，是否同意？", 
+                "悔棋请求", 
+                JOptionPane.YES_NO_OPTION);
+                
+            GameMessage response = new GameMessage(GameMessage.MessageType.UNDO_RESPONSE);
+            response.setAccepted(option == JOptionPane.YES_OPTION);
+            if (option != JOptionPane.YES_OPTION) {
+                response.setReason("拒绝悔棋请求");
+            }
+            client.sendMessage(response);
+            
+            if (option == JOptionPane.YES_OPTION) {
+                chatPanel.appendSystemMessage("同意了 " + requester + " 的悔棋请求");
+            } else {
+                chatPanel.appendSystemMessage("拒绝了 " + requester + " 的悔棋请求");
+            }
+        });
+    }
+    
+    /**
+     * 接收悔棋回应
+     */
+    public void onUndoResponse(boolean accepted, String reason) {
+        SwingUtilities.invokeLater(() -> {
+            if (accepted) {
+                chatPanel.appendSystemMessage("对手同意了悔棋请求");
+                // 悔棋成功的处理在onUndoRefresh中进行
+            } else {
+                String message = reason != null ? reason : "对手拒绝了悔棋请求";
+                chatPanel.appendSystemMessage(message);
+                JOptionPane.showMessageDialog(this, message);
+                // 重新启用悔棋按钮
+                controlPanel.setUndoEnabled(!isMyTurn);
+            }
+        });
+    }
+    
+    /**
+     * 接收求和请求
+     */
+    public void onDrawRequest(String requester) {
+        SwingUtilities.invokeLater(() -> {
+            int option = JOptionPane.showConfirmDialog(this, 
+                requester + " 请求求和，是否同意？", 
+                "求和请求", 
+                JOptionPane.YES_NO_OPTION);
+                
+            GameMessage response = new GameMessage(GameMessage.MessageType.DRAW_RESPONSE);
+            response.setAccepted(option == JOptionPane.YES_OPTION);
+            if (option != JOptionPane.YES_OPTION) {
+                response.setReason("拒绝求和请求");
+            }
+            client.sendMessage(response);
+            
+            if (option == JOptionPane.YES_OPTION) {
+                chatPanel.appendSystemMessage("同意了 " + requester + " 的求和请求");
+            } else {
+                chatPanel.appendSystemMessage("拒绝了 " + requester + " 的求和请求");
+            }
+        });
+    }
+    
+    /**
+     * 接收求和回应
+     */
+    public void onDrawResponse(boolean accepted, String reason) {
+        SwingUtilities.invokeLater(() -> {
+            controlPanel.setDrawEnabled(true);
+            
+            if (accepted) {
+                gameTimer.stop();
+                chatPanel.appendSystemMessage("双方同意求和，游戏结束");
+                statusLabel.setText("游戏结束 - 双方求和");
+                
+                int option = JOptionPane.showConfirmDialog(this, 
+                    "双方同意求和！\n是否返回大厅？", 
+                    "游戏结束", 
+                    JOptionPane.YES_NO_OPTION);
+                    
+                if (option == JOptionPane.YES_OPTION) {
+                    LobbyFrame lobbyFrame = new LobbyFrame(client, username, userAvatar, avatarIndex);
+                    lobbyFrame.setVisible(true);
+                    dispose();
+                }
+            } else {
+                String message = reason != null ? reason : "对手拒绝了求和请求";
+                chatPanel.appendSystemMessage(message);
+                JOptionPane.showMessageDialog(this, message);
+            }
+        });
+    }
+    
+    /**
+     * 接收认输消息
+     */
+    public void onSurrender(String surrenderer, boolean redWin) {
+        SwingUtilities.invokeLater(() -> {
+            gameTimer.stop();
+            
+            String message;
+            if ((redWin && isRed) || (!redWin && !isRed)) {
+                message = "对手认输，你获胜了！";
+                playSound("jiang");
+            } else {
+                message = "你认输了！";
+            }
+            
+            chatPanel.appendSystemMessage(surrenderer + " 认输了");
             statusLabel.setText("游戏结束 - " + message);
             
             int option = JOptionPane.showConfirmDialog(this, 

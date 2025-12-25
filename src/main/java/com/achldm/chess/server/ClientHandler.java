@@ -66,6 +66,26 @@ public class ClientHandler extends Thread {
                 server.handleChatMessage(message, this);
                 break;
                 
+            case UNDO_REQUEST:
+                server.handleUndoRequest(this);
+                break;
+                
+            case UNDO_RESPONSE:
+                server.handleUndoResponse(message, this);
+                break;
+                
+            case DRAW_REQUEST:
+                server.handleDrawRequest(this);
+                break;
+                
+            case DRAW_RESPONSE:
+                server.handleDrawResponse(message, this);
+                break;
+                
+            case SURRENDER:
+                server.handleSurrender(this);
+                break;
+                
             case HEARTBEAT:
                 // 心跳包处理
                 sendMessage(new GameMessage(GameMessage.MessageType.HEARTBEAT));

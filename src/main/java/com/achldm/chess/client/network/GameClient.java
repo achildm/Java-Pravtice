@@ -88,6 +88,13 @@ public class GameClient {
                 // 游戏开始的额外处理
                 break;
                 
+            case UNDO_REFRESH:
+                if (gameFrame != null) {
+                    // 悔棋后的棋盘刷新，使用服务器发送的棋盘状态
+                    gameFrame.onUndoRefresh(message.isRed(), message.getBoardState());
+                }
+                break;
+                
             case MOVE:
                 if (gameFrame != null) {
                     gameFrame.onOpponentMove(message.getFromX(), message.getFromY(), 
@@ -102,8 +109,40 @@ public class GameClient {
                 break;
                 
             case CHAT:
-                if (lobbyFrame != null) {
+                if (gameFrame != null) {
+                    gameFrame.onChatMessage(message.getUsername(), message.getContent());
+                } else if (lobbyFrame != null) {
                     lobbyFrame.onChatMessage(message.getUsername(), message.getContent());
+                }
+                break;
+                
+            case UNDO_REQUEST:
+                if (gameFrame != null) {
+                    gameFrame.onUndoRequest(message.getUsername());
+                }
+                break;
+                
+            case UNDO_RESPONSE:
+                if (gameFrame != null) {
+                    gameFrame.onUndoResponse(message.isAccepted(), message.getReason());
+                }
+                break;
+                
+            case DRAW_REQUEST:
+                if (gameFrame != null) {
+                    gameFrame.onDrawRequest(message.getUsername());
+                }
+                break;
+                
+            case DRAW_RESPONSE:
+                if (gameFrame != null) {
+                    gameFrame.onDrawResponse(message.isAccepted(), message.getReason());
+                }
+                break;
+                
+            case SURRENDER:
+                if (gameFrame != null) {
+                    gameFrame.onSurrender(message.getUsername(), message.isRed());
                 }
                 break;
                 
