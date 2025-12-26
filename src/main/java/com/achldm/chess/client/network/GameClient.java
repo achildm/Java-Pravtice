@@ -33,12 +33,20 @@ public class GameClient {
     /**
      * 发送消息到服务器
      */
-    public void sendMessage(GameMessage message) {
+    public synchronized void sendMessage(GameMessage message) {
         try {
-            out.writeObject(message);
-            out.flush();
+            if (socket != null && !socket.isClosed() && out != null) {
+                out.writeObject(message);
+                out.flush();
+                System.out.println("发送消息: " + message.getType());
+            } else {
+                System.err.println("连接已断开，无法发送消息: " + message.getType());
+                throw new IOException("连接已断开");
+            }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("发送消息失败: " + message.getType() + " - " + e.getMessage());
+            // 可以在这里添加重连逻辑或通知UI连接断开
+            throw new RuntimeException("消息发送失败", e);
         }
     }
     

@@ -118,12 +118,17 @@ public class ClientHandler extends Thread {
     /**
      * 发送消息给客户端
      */
-    public void sendMessage(GameMessage message) {
+    public synchronized void sendMessage(GameMessage message) {
         try {
-            out.writeObject(message);
-            out.flush();
+            if (socket != null && !socket.isClosed() && out != null) {
+                out.writeObject(message);
+                out.flush();
+                System.out.println("发送消息给 " + username + ": " + message.getType());
+            } else {
+                System.err.println("客户端连接已断开，无法发送消息: " + message.getType());
+            }
         } catch (IOException e) {
-            System.out.println("发送消息失败: " + e.getMessage());
+            System.err.println("发送消息失败给 " + username + ": " + message.getType() + " - " + e.getMessage());
             closeConnection();
         }
     }

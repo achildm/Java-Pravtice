@@ -63,7 +63,7 @@ public class LoginFrame extends JFrame {
         avatarPanel.setPreferredSize(new Dimension(550, 450));
         
         // 加载头像
-        for (int i = 1; i <= 99; i++) { // 增加到99个，确保有足够的头像
+        for (int i = 1; i <= 99; i++) {
             try {
                 String path = "/face/" + i + "-1.gif";
                 java.net.URL imageURL = getClass().getResource(path);

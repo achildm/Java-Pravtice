@@ -237,7 +237,7 @@ public class GameFrame extends JFrame {
                 
                 updateStatus();
                 boardPanel.repaint();
-                playSound("go");
+                playSound("seat");
                 
                 // 检查游戏是否结束
                 if (chessBoard.isGameOver()) {
@@ -432,8 +432,6 @@ public class GameFrame extends JFrame {
      */
     public void onDrawResponse(boolean accepted, String reason) {
         SwingUtilities.invokeLater(() -> {
-            controlPanel.setDrawEnabled(true);
-            
             if (accepted) {
                 gameTimer.stop();
                 chatPanel.appendSystemMessage("双方同意求和，游戏结束");
@@ -453,6 +451,8 @@ public class GameFrame extends JFrame {
                 String message = reason != null ? reason : "对手拒绝了求和请求";
                 chatPanel.appendSystemMessage(message);
                 JOptionPane.showMessageDialog(this, message);
+                // 重新启用求和按钮
+                controlPanel.setDrawEnabled(true);
             }
         });
     }
@@ -490,7 +490,7 @@ public class GameFrame extends JFrame {
     
     private void playSound(String soundName) {
         try {
-            URL soundUrl = getClass().getResource("/audio/" + soundName + ".wav");
+            URL soundUrl = GameFrame.class.getResource("/audio/" + soundName + ".wav");
             if (soundUrl != null) {
                 AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(soundUrl);
                 Clip clip = AudioSystem.getClip();
@@ -498,7 +498,6 @@ public class GameFrame extends JFrame {
                 clip.start();
             }
         } catch (Exception e) {
-            // 忽略音效播放错误
         }
     }
     

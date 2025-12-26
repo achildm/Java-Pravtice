@@ -1,5 +1,6 @@
 package com.achldm.chess.server;
 
+import com.achldm.chess.client.ui.GameFrame;
 import com.achldm.chess.common.GameMessage;
 import com.achldm.chess.common.ChessPiece;
 import com.achldm.chess.game.ChessBoard;

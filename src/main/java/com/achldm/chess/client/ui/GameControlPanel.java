@@ -80,16 +80,47 @@ public class GameControlPanel extends JPanel {
      * 请求悔棋
      */
     private void requestUndo() {
+        // 防止重复点击
+        if (!undoButton.isEnabled()) {
+            return;
+        }
+        
         int option = JOptionPane.showConfirmDialog(this, 
             "确定要请求悔棋吗？", 
             "悔棋请求", 
             JOptionPane.YES_NO_OPTION);
             
         if (option == JOptionPane.YES_OPTION) {
-            GameMessage undoMsg = new GameMessage(GameMessage.MessageType.UNDO_REQUEST);
-            client.sendMessage(undoMsg);
+            // 立即禁用按钮，防止重复点击
             undoButton.setEnabled(false);
-            chatPanel.appendSystemMessage("已发送悔棋请求，等待对手回应...");
+            undoButton.setText("悔棋中...");
+            
+            // 在后台线程发送消息，避免阻塞UI
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    GameMessage undoMsg = new GameMessage(GameMessage.MessageType.UNDO_REQUEST);
+                    client.sendMessage(undoMsg);
+                    chatPanel.appendSystemMessage("已发送悔棋请求，等待对手回应...");
+                    
+                    // 设置超时恢复按钮状态（防止网络问题导致按钮永久禁用）
+                    Timer timeoutTimer = new Timer(10000, e -> {
+                        if (!undoButton.isEnabled()) {
+                            undoButton.setEnabled(true);
+                            undoButton.setText("悔棋");
+                            chatPanel.appendSystemMessage("悔棋请求超时，请重试");
+                        }
+                    });
+                    timeoutTimer.setRepeats(false);
+                    timeoutTimer.start();
+                    
+                } catch (Exception e) {
+                    // 发送失败时恢复按钮状态
+                    undoButton.setEnabled(true);
+                    undoButton.setText("悔棋");
+                    chatPanel.appendSystemMessage("悔棋请求发送失败，请重试");
+                    e.printStackTrace();
+                }
+            });
         }
     }
     
@@ -97,16 +128,47 @@ public class GameControlPanel extends JPanel {
      * 请求求和
      */
     private void requestDraw() {
+        // 防止重复点击
+        if (!drawButton.isEnabled()) {
+            return;
+        }
+        
         int option = JOptionPane.showConfirmDialog(this, 
             "确定要请求求和吗？", 
             "求和请求", 
             JOptionPane.YES_NO_OPTION);
             
         if (option == JOptionPane.YES_OPTION) {
-            GameMessage drawMsg = new GameMessage(GameMessage.MessageType.DRAW_REQUEST);
-            client.sendMessage(drawMsg);
+            // 立即禁用按钮，防止重复点击
             drawButton.setEnabled(false);
-            chatPanel.appendSystemMessage("已发送求和请求，等待对手回应...");
+            drawButton.setText("求和中...");
+            
+            // 在后台线程发送消息，避免阻塞UI
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    GameMessage drawMsg = new GameMessage(GameMessage.MessageType.DRAW_REQUEST);
+                    client.sendMessage(drawMsg);
+                    chatPanel.appendSystemMessage("已发送求和请求，等待对手回应...");
+                    
+                    // 设置超时恢复按钮状态（防止网络问题导致按钮永久禁用）
+                    Timer timeoutTimer = new Timer(10000, e -> {
+                        if (!drawButton.isEnabled()) {
+                            drawButton.setEnabled(true);
+                            drawButton.setText("求和");
+                            chatPanel.appendSystemMessage("求和请求超时，请重试");
+                        }
+                    });
+                    timeoutTimer.setRepeats(false);
+                    timeoutTimer.start();
+                    
+                } catch (Exception e) {
+                    // 发送失败时恢复按钮状态
+                    drawButton.setEnabled(true);
+                    drawButton.setText("求和");
+                    chatPanel.appendSystemMessage("求和请求发送失败，请重试");
+                    e.printStackTrace();
+                }
+            });
         }
     }
     
@@ -114,6 +176,11 @@ public class GameControlPanel extends JPanel {
      * 认输
      */
     private void surrender() {
+        // 防止重复点击
+        if (!surrenderButton.isEnabled()) {
+            return;
+        }
+        
         int option = JOptionPane.showConfirmDialog(this, 
             "确定要认输吗？认输后游戏将立即结束。", 
             "认输确认", 
@@ -121,8 +188,36 @@ public class GameControlPanel extends JPanel {
             JOptionPane.WARNING_MESSAGE);
             
         if (option == JOptionPane.YES_OPTION) {
-            GameMessage surrenderMsg = new GameMessage(GameMessage.MessageType.SURRENDER);
-            client.sendMessage(surrenderMsg);
+            // 立即禁用按钮，防止重复点击
+            surrenderButton.setEnabled(false);
+            surrenderButton.setText("认输中...");
+            
+            // 在后台线程发送消息，避免阻塞UI
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    GameMessage surrenderMsg = new GameMessage(GameMessage.MessageType.SURRENDER);
+                    client.sendMessage(surrenderMsg);
+                    chatPanel.appendSystemMessage("已发送认输请求...");
+                    
+                    // 设置超时恢复按钮状态（防止网络问题导致按钮永久禁用）
+                    Timer timeoutTimer = new Timer(5000, e -> {
+                        if (!surrenderButton.isEnabled()) {
+                            surrenderButton.setEnabled(true);
+                            surrenderButton.setText("认输");
+                            chatPanel.appendSystemMessage("认输请求可能未成功发送，请重试");
+                        }
+                    });
+                    timeoutTimer.setRepeats(false);
+                    timeoutTimer.start();
+                    
+                } catch (Exception e) {
+                    // 发送失败时恢复按钮状态
+                    surrenderButton.setEnabled(true);
+                    surrenderButton.setText("认输");
+                    chatPanel.appendSystemMessage("认输请求发送失败，请重试");
+                    e.printStackTrace();
+                }
+            });
         }
     }
     
@@ -132,6 +227,9 @@ public class GameControlPanel extends JPanel {
     public void setUndoEnabled(boolean enabled) {
         SwingUtilities.invokeLater(() -> {
             undoButton.setEnabled(enabled);
+            if (enabled) {
+                undoButton.setText("悔棋");
+            }
         });
     }
     
@@ -141,6 +239,21 @@ public class GameControlPanel extends JPanel {
     public void setDrawEnabled(boolean enabled) {
         SwingUtilities.invokeLater(() -> {
             drawButton.setEnabled(enabled);
+            if (enabled) {
+                drawButton.setText("求和");
+            }
+        });
+    }
+    
+    /**
+     * 设置认输按钮是否可用
+     */
+    public void setSurrenderEnabled(boolean enabled) {
+        SwingUtilities.invokeLater(() -> {
+            surrenderButton.setEnabled(enabled);
+            if (enabled) {
+                surrenderButton.setText("认输");
+            }
         });
     }
     
@@ -152,6 +265,11 @@ public class GameControlPanel extends JPanel {
             undoButton.setEnabled(enabled);
             drawButton.setEnabled(enabled);
             surrenderButton.setEnabled(enabled);
+            if (enabled) {
+                undoButton.setText("悔棋");
+                drawButton.setText("求和");
+                surrenderButton.setText("认输");
+            }
         });
     }
 }
